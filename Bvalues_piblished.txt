@@ -46,7 +46,17 @@ targets
 sub(baseDir, "", targets$Basename)
 
 rset <- read.metharray.exp(targets = targets)
+# Change sentrix to sample name
+df <- data.frame(sentrix=rset@colData@rownames)
+names <- read.csv2("~/Analysis_124_SARC/CNV/SARC - names_to_Rset.csv",sep=",")
+df$names <- names$name[match(df$sentrix,names$sentrix)]
 
+# Check that order of cells is the same
+all.equal(rset@colData@rownames, df$sentrix)
+#TRUE 
+
+# change sentrix to names
+rset@colData@rownames <- df$names
 rset
 
 samplesheet <- pData(rset)
