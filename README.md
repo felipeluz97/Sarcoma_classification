@@ -8,10 +8,16 @@ Fusion genes calling was run in Linux environment (GNU/Linux 6.5.0-21-generic x8
 
 Please read packages instructions before running:
 
-Minfi: https://bioconductor.org/packages/release/bioc/html/minfi.html
-Conumee2.0: https://github.com/hovestadtlab/conumee2
+Minfi: https://bioconductor.org/packages/release/bioc/html/minfi.html 
+
+Conumee2.0: https://github.com/hovestadtlab/conumee2 
+
 STAR-FUSION: https://github.com/STAR-Fusion/STAR-Fusion
+
 ChimeraViz: https://www.bioconductor.org/packages/devel/bioc/vignettes/chimeraviz/inst/doc/chimeraviz-vignette.html
+
 pheatmap: https://cran.r-project.org/web/packages/pheatmap/index.html
+
 MethylResolver: https://github.com/darneson/MethylResolver
+
 FASTQC: https://github.com/s-andrews/FastQC
