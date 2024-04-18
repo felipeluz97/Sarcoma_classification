@@ -31,15 +31,17 @@ library("rlist")
 RGset <- read.metharray.exp(base = "~/Analysis_124_SARC/Bval/idats", targets = NULL, extended = FALSE,
                             recursive = FALSE, verbose = FALSE, force = FALSE) 
 
-df <- data.frame(sentrix=RGset@colData@rownames) # Used to rename sentrix
+# Change sentrix to sample name
+df <- data.frame(sentrix=RGset@colData@rownames)
 names <- read.csv2("~/Analysis_124_SARC/CNV/SARC - names_to_Rset.csv",sep=",")
-names2RG <- merge(names,df,by="sentrix")
+df$names <- names$name[match(df$sentrix,names$sentrix)]
+
 # Check that order of cells is the same
-all.equal(RGset@colData@rownames, names2RG$sentrix)
+all.equal(RGset@colData@rownames, df$sentrix)
 #TRUE 
 
 # change sentrix to names
-RGset@colData@rownames <- names2RG$name
+RGset@colData@rownames <- df$names
 
 Mset <- preprocessIllumina(RGset, bg.correct = TRUE, normalize = NULL)
 
