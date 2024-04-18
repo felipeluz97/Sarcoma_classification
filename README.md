@@ -1,9 +1,9 @@
 Shared codes and scripts used in "DNA methylation profile for accurate classification of pediatric sarcomas"
 Silva, FLT et.al (2024)
 
-Note: Tumor infiltrating leucokytes deconvolution and tSNE anlaysis depend on Beta-value matrix generated using Minfi R package (R version 4.3.2)
+Note: Tumor infiltrating leucokytes deconvolution and tSNE analysis depend on Beta-value matrix generated using Minfi R package (R version 4.3.2)
 
-Methylation analysis to obtain Beta value Matrix, TILs deconvolution, tSNE and Copy Number Alterations were run using R paackages
+Methylation analysis to obtain Beta value Matrix, TILs deconvolution, tSNE and Copy Number Alterations were run using R paackages.
 Fusion genes calling was run in Linux environment (GNU/Linux 6.5.0-21-generic x86_64)
 
 Please read packages instructions before running:
