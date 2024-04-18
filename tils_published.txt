@@ -1,0 +1,101 @@
+# Script to deconvolute tumor infiltratilg leukocytes from Beta-values matrix
+#analyzed by: Felipe Luz
+#Date: 15/04/2024
+#pack: MethylResolver
+#Samples:  244 IDATS (Sarcomas)
+
+
+# B = Beta value matrix obtained from Mini script
+
+# install.packages('devtools')
+# devtools::install_github(repo = 'darneson/MethylResolver')
+library(MethylResolver)
+library(dplyr)
+
+setwd("~/Analysis_124_SARC/TILS")
+
+
+MR <- MethylResolver(methylMix = B, methylSig = MethylSig,
+                    betaPrime = FALSE, outputPath = "./", outputName = 
+                      "MethylResolver", doPar = TRUE, numCores = "auto", 
+                    alpha = 0.5, absolute = TRUE, purityModel = RFmodel)
+
+library(ggplot2)
+library(dplyr)
+library(metan)
+
+
+
+infiltrate <- read.csv2("MethylResolver_122sarc.csv",sep=",")
+sample <- read.csv2("samples_122sarc.csv",sep=",")
+sample$id <- 1:nrow(sample)
+
+merge2 <- merge(infiltrate,sample,by="sentrix")
+merge2 <- merge2[order(merge2$id), ]
+
+
+merge2$sentrix <- merge2$SAMPLES
+merge2$SAMPLES <- NULL
+
+
+merge2 <- merge2 %>%
+  rename(sample=sentrix)
+
+
+rownames(merge2) <- merge2$sample
+merge2$sample<- NULL
+
+merge2$id <- NULL
+
+set.seed(1)
+mat <- make_long(merge2)
+library(RColorBrewer)
+myCol <- c(brewer.pal(5, "Pastel2")[1:5],
+           brewer.pal(5, "Pastel1")[1:5],
+           brewer.pal(5, "Paired")[1:5])
+png("~/Analysis_124_SARC/TILS/TILS.png",
+    width = 1500,
+    height = 800)
+mat %>% 
+  group_by(GEN, ENV) %>% 
+  summarize(relative_fraction=Y) %>% 
+  ggplot(aes(x = factor(GEN,level=sample$SAMPLES), y = relative_fraction, group = ENV, fill = ENV)) +
+  theme(axis.text.x  = element_text(size = 12, angle = 90,  vjust = 0.5, hjust=1),
+        axis.text.y  = element_text(size = 12))+
+  geom_bar(stat = "identity")+
+  scale_fill_manual(values=myCol)
+dev.off()
+
+
+############### PURITY ################
+
+pur <- read.csv2("purity.csv",sep=",")
+sample <- read.csv2("samples_122sarc.csv",sep=",")
+merge <- merge(pur,sample,by="sentrix")
+merge$sentrix <- merge$SAMPLES
+merge$SAMPLES <- NULL
+merge <- merge %>%
+  rename(sample=sentrix)
+
+
+rownames(merge) <- merge$sample
+merge$sample <- NULL
+
+set.seed(1)
+mat <- make_long(merge)
+
+
+png("~/Analysis_124_SARC/TILS/PUR.png",
+    width = 1500,
+    height = 800)
+mat %>% 
+  group_by(GEN, ENV) %>% 
+  summarize(relative_fraction=Y) %>% 
+  ggplot(aes(x = factor(GEN,level=sample$SAMPLES), y = relative_fraction, group = ENV, fill = ENV)) +
+  theme(axis.text.x  = element_text(size = 12, angle = 90,  vjust = 0.5, hjust=1),
+        axis.text.y  = element_text(size = 12)) +
+  geom_bar(stat = "identity")+
+  scale_fill_manual(values=myCol) 
+dev.off()
+
+

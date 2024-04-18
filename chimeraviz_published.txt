@@ -1,0 +1,16 @@
+
+remotes::install_github("stianlagstad/chimeraviz")
+library(chimeraviz)
+
+list <- list.files()
+
+starfusionData <- system.file(
+  "extdata",
+  "star-fusion.fusion_candidates.final.abridged.txt",
+  package = "chimeraviz")
+fusions <- import_starfusion(list[[i]], "hg38", 3) # change i for samples in list
+# This should import a list of 3 fusions described in Fusion objects.
+
+
+plot_circle(fusions)
+

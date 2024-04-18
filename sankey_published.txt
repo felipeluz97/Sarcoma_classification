@@ -1,0 +1,38 @@
+# Sankey plot
+#analyzed by: Felipe Luz
+#Date: 15/04/2024
+#pack: ggsankey. ggplot2
+#Samples:  244 IDATS (Sarcomas)
+
+
+install.packages("remotes")
+remotes::install_github("davidsjoberg/ggsankey")
+
+library(ggsankey)
+library(ggplot2)
+library(dplyr)
+library(ggalluvial)
+
+slope <- read.csv2("sarc.csv",sep=",")
+
+df <- slope %>%
+  make_long(HISTO,CLASS,CONCORDANT) 
+
+png("~/Analysis_124_SARC/sankey/alluvial_122sarc.png",
+    width = 800,
+    height = 2500)
+ggplot(as.data.frame(slope),
+       aes(axis1 = HISTO, axis2 = CLASS)) +
+  geom_alluvium(aes(fill = CONCORDANT), width = 2/12) +
+  geom_stratum(width = 1/12, fill = "grey", color = "grey") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)), size= 6.0) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum)),size= 6.0) +
+  scale_x_discrete(limits = c("HISTO", "CLASS"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Histology vs Methylation-based Class")
+dev.off()
+
+
+
+
+

@@ -1,0 +1,261 @@
+# CNV from methylome array intensities
+#analyzed by: Felipe Luz
+#Date: 15/04/2024
+#pack: conumee2
+#Samples:  244 IDATS (Sarcomas)
+
+
+# 1. install
+# Install conumee2 from tar.gz
+
+options(download.file.method = "wininet") # to support HTTPS connections
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+devtools::install_github("hovestadtlab/conumee2", subdir = "conumee2")
+BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b3.hg19")
+BiocManager::install("minfiData")
+BiocManager::install("rlist")
+
+BiocManager::install("CopyNumber450kData") # install fro tar.gz
+
+################### 2. Load the data #######################
+library("minfi")
+library("conumee2.0")
+library("dplyr")
+library("data.table")
+library("rlist")
+
+
+#2.1 Samples
+RGset <- read.metharray.exp(base = "~/Analysis_124_SARC/Bval/idats", targets = NULL, extended = FALSE,
+                            recursive = FALSE, verbose = FALSE, force = FALSE) 
+
+df <- data.frame(sentrix=RGset@colData@rownames) # Used to rename sentrix
+names <- read.csv2("~/Analysis_124_SARC/CNV/SARC - names_to_Rset.csv",sep=",")
+names2RG <- merge(names,df,by="sentrix")
+# Check that order of cells is the same
+all.equal(RGset@colData@rownames, names2RG$sentrix)
+#TRUE 
+
+# change sentrix to names
+RGset@colData@rownames <- names2RG$name
+
+Mset <- preprocessIllumina(RGset, bg.correct = TRUE, normalize = NULL)
+
+Mset
+
+library("minfiData")
+data(MsetEx)
+MsetEx
+minfi.data <- CNV.load(MsetEx)
+minfi.controls <- pData(MsetEx)$status == "normal"
+
+
+
+
+#################### 3 Combine intensity values ########################
+d <- CNV.load(Mset)
+# c <- CNV.load(Msetcontrol)
+
+#################### 4 Annotation #######################################
+data(exclude_regions)
+data(detail_regions)
+
+# In case you want to plot genes other than default
+# Genes is a df containing: chrom (i.e chr2), cdsStart, cdsEnd, strand and name2, which can be obtained from UCSC table browser
+# 
+# genes <- read.csv2("~/IDATS_boldrini/Analysis_269/CNV_imprint/genes_reduced.csv",sep=";")
+# as.data.frame(genes)
+# 
+# reduced <- makeGRangesFromDataFrame(genes,
+#                                     keep.extra.columns=TRUE,
+#                                     ignore.strand=FALSE,
+#                                     seqinfo=NULL,
+#                                     seqnames.field="chrom", 
+#                                     start.field="cdsStart",
+#                                     end.field="cdsEnd",
+#                                     strand.field="strand",
+#                                     starts.in.df.are.0based=FALSE,
+#                                     na.rm=FALSE)
+
+# annoR <- CNV.create_anno(array_type = "overlap", exclude_regions = exclude_regions, detail_regions = reduced, chrXY = TRUE)
+
+annoR <- CNV.create_anno(array_type = "overlap", exclude_regions = exclude_regions,detail_regions = detail_regions, chrXY = FALSE)
+Mset <- mapToGenome(Mset)
+annoR@probes <- subsetByOverlaps(annoR@probes, granges(Mset))
+
+
+
+
+
+###################### 5 Perform CNV analysis ##########################################
+aux <- colnames(d@intensity)
+lista <- list()
+length(aux)
+
+# aux_c <- colnames(c@intensity)
+
+# length(aux_c)
+
+
+for(i in 1:length(aux))
+{
+  # R <- CNV.fit(d[aux[i]], c[aux_c],annoR)
+  R <- CNV.fit(d[aux[i]], minfi.data[minfi.controls],annoR)
+  R <- CNV.bin(R)
+  R <- CNV.detail(R)
+  R <- CNV.segment(R)
+  
+  lista[[i]] <- R
+}
+
+# Here we subset objects by molecular class to plot sumary plots
+# filter for OS, ES, BCOR, CIC and RMS for summary plot
+# Total (122)
+x_total <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d,
+                                            ref =minfi.data[minfi.controls], annoR))))
+group <- read.csv2("~/Analysis_124_SARC/CNV/merge2.csv",sep=",")
+
+# OS
+group_OS <- group %>%
+  filter(class %in% c("OS_HG"))
+OS <- group_OS$names
+d_os <- d
+d_os@intensity <- d_os@intensity[OS]
+
+x_OS <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_os,
+                                                  ref =minfi.data[minfi.controls], annoR))))
+
+# EWING
+group_ES <- group %>%
+  filter(class %in% c("EWING"))
+ES <- group_ES$names
+d_ES <- d
+d_ES@intensity <- d_ES@intensity[ES]
+
+x_ES <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_ES,
+                                               ref =minfi.data[minfi.controls], annoR))))
+
+# BCOR
+group_BCOR <- group %>%
+  filter(class %in% c("SBRCT_BCOR"))
+BCOR <- group_BCOR$names
+d_BCOR <- d
+d_BCOR@intensity <- d_BCOR@intensity[BCOR]
+
+x_BCOR <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_BCOR,
+                                               ref =minfi.data[minfi.controls], annoR))))
+# CIC
+group_CIC <- group %>%
+  filter(class %in% c("CNS_SARC_CIC"))
+CIC <- group_CIC$names
+d_CIC <- d
+d_CIC@intensity <- d_CIC@intensity[CIC]
+
+x_CIC <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_CIC,
+                                                 ref =minfi.data[minfi.controls], annoR))))
+
+# RMS
+group_RMS<- group %>%
+  filter(class %in% c("ERMS","RMS_EMB"))
+RMS <- group_RMS$names
+d_RMS <- d
+d_RMS@intensity <- d_RMS@intensity[RMS]
+
+x_RMS <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_RMS,
+                                                ref =minfi.data[minfi.controls], annoR))))
+
+# SYSA
+group_SYSA<- group %>%
+  filter(class %in% c("SYSA"))
+SYSA <- group_SYSA$names
+d_SYSA<- d
+d_SYSA@intensity <- d_SYSA@intensity[SYSA]
+
+x_SYSA <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_SYSA,
+                                                ref =minfi.data[minfi.controls], annoR))))
+
+saveRDS(lista,"~/Analysis_124_SARC/CNV/output/lista.rds")
+saveRDS(x,"~/Analysis_124_SARC/CNV/output/x.rds")
+##################### 6. Output plots and text files ###################################
+
+# Text file 
+dir.create(("~/Analysis_124_SARC/CNV/output"))
+setwd("~/Analysis_124_SARC/CNV/output")
+
+
+for(i in 1:length(aux))
+{
+  CNV.write(lista[[i]], what = "bins", file = paste0(aux[i], "_CNVbins.igv"))
+  CNV.write(lista[[i]], what = "probes", file = paste0(aux[i], "_CNVprobes.igv"))
+  CNV.write(lista[[i]], what = "segments", file = paste0(aux[i], "_CNVsegments.seg"))  # adjust path
+  CNV.write(lista[[i]], what = "detail", file = paste0(aux[i], "_CNVdetail.txt"))
+  png(file = paste0("~/Analysis_124_SARC/CNV/output/", aux[i], "_plot.png"),
+      width = 1300, height = 800)
+  CNV.genomeplot(lista[[i]])
+  dev.off()
+  
+}
+
+
+
+png(file = "~/Analysis_124_SARC/CNV/output/heatmap.png",
+    width = 3000, height = 800)
+CNV.heatmap(x_total)
+dev.off()
+
+
+
+
+png(file = "~/Analysis_124_SARC/CNV/output/summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_total, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/OS_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_OS, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/ES_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_ES, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/SBRCT_BCOR_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_BCOR, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/CIC_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_CIC, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/ERMS_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_RMS, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/SYSA_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_SYSA, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/SYSA_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_SYSA, threshold = 0.15)
+dev.off()
+
+
+i <- 6 # Search sample in names2RG to get the row namber (lista)
+
+  png(file = "~/Analysis_124_SARC/CNV/output/chr8_SARC_06.png",
+      width = 600, height = 350)
+  CNV.genomeplot(lista[[i]], chr = "chr8")
+  dev.off()
+  
+  
+  
+

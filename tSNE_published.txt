@@ -1,0 +1,146 @@
+# Heatmap, hierarchical clustering and tSNE from Beta-values matrix 
+#analyzed by: Felipe Luz
+#Samples:  244 IDATS (Sarcomas)
+
+
+# B = B value Matrix obtained from Minfi
+
+library(dplyr)
+
+group <- read.csv2("tsne.csv",sep=",")
+
+ Bt <- t(B)
+ Bt2 <- as.data.frame(Bt)
+
+# Bt2$sentrix <- rownames(Bt)
+
+# Bt2 <- Bt2 %>%
+#   filter(sentrix %in% group$sentrix)
+
+# Bt2$sentrix <- NULL
+
+
+
+#################################### tSNE #####################################
+ 
+prcomp_svds <-
+  function(x, retx = TRUE, center = TRUE, scale. = FALSE, tol = NULL, k=10, ...)
+  {
+    chkDots(...)
+    x <- as.matrix(x)
+    x <- scale(x, center = center, scale = scale.)
+    cen <- attr(x, "scaled:center")
+    sc <- attr(x, "scaled:scale")
+    if(any(sc == 0))
+      stop("cannot rescale a constant/zero column to unit variance")
+    s <- svds(x, k)
+    s$d <- s$d / sqrt(max(1, nrow(x) - 1))
+    if (!is.null(tol)) {
+      ## we get rank at least one even for a 0 matrix.
+      rank <- sum(s$d > (s$d[1L]*tol))
+      if (rank < ncol(x)) {
+        s$v <- s$v[, 1L:rank, drop = FALSE]
+        s$d <- s$d[1L:rank]
+      }
+    }
+    dimnames(s$v) <-
+      list(colnames(x), paste0("PC", seq_len(ncol(s$v))))
+    r <- list(sdev = s$d, rotation = s$v,
+              center = if(is.null(cen)) FALSE else cen,
+              scale = if(is.null(sc)) FALSE else sc)
+    if (retx) r$x <- x %*% s$v
+    class(r) <- "prcomp"
+    r
+  }
+
+##################################
+
+aux <- data.frame(1:nrow(group),1)
+aux$sentrix <- rownames(Bt2)
+
+aux$X1.nrow.group. <- NULL
+aux$X1 <- NULL
+
+group3 <- left_join(aux,group)
+
+options(max.print = 1000)
+options(stringsAsFactors = FALSE)
+options(scipen = 999)
+
+library(Rtsne)
+library(RSpectra)
+library(ggplot2)
+# library(plotly)
+library(ggfortify)
+library(ggsci)
+
+
+
+# sd filtering to 10K for sarcomas
+betas <- Bt2[,order(-apply(Bt2,2,sd))[1:10000]]
+betas2 <- as.matrix(betas)
+new_data <- matrix(as.numeric(betas2[1:nrow(group), 1:10000]), ncol = 10000, nrow=nrow(group) ) #nrow: N samples
+
+
+
+# calculate first 94 PCs
+pca <- prcomp_svds(new_data,k=94)
+p <- autoplot(pca)
+
+
+# calculate tSNE
+res <- Rtsne(pca$x,pca=F,max_iter=3000,theta=0,verbose=T,perplexity = 30)
+Y <- res$Y 
+
+
+
+# scatterplot tSNE
+
+library(RColorBrewer)
+par(mar=c(3,4,2,2))
+display.brewer.all()
+myCol <- brewer.pal(10,"Spectral") 
+
+png("~/Analysis_124_SARC/tSNE/tSNE_122sarc.png",
+    width = 1900,
+    height = 1200)
+ggplot(Y,
+       aes(x=Y[,1],y=Y[,2],col=group3$CLASS.y, shape = group3$score_sum)) +
+  scale_shape_manual(values=c(18,19,20))+
+  geom_point(size=5) +
+  labs(title = "tSNE Sarcomas",x="tsne - 1",y = "tsne - 2", color = group3$CLASS.y) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),legend.position = "none",
+        text = element_text(size = 15)) +
+  ggrepel::geom_text_repel(data = Y, aes(label = group3$CLASS.y),
+                           segment.colour="black",na.rm=FALSE, 
+                           max.overlaps=36) 
+dev.off()
+
+##### HETAMAP ######
+heat <- as.data.frame(betas2[1:nrow(group),1:10000])
+heat2 <- t(heat)
+
+col <- as.data.frame(group3$CLASS.y)
+rownames(col) <- group3$sentrix
+
+library("pheatmap")
+
+colnames(heat2) <- group3$sentrix
+
+png("~/Analysis_124_SARC/tSNE/heatmap_122sarc.png",
+    width = 800,
+    height = 1200)
+pheatmap(heat2,
+         scale="none",
+         cluster_cols = TRUE,
+         cluster_rows = TRUE,
+         clustering_distance_cols = "euclidean",
+         clustering_distance_rows = "euclidean",
+         clustering_method = "ward",
+         show_rownames = FALSE,
+         show_colnames = TRUE,
+         annotation_col = col,
+         color = colorRampPalette(c("#5981bd", "white", "#6a1127"))(1000))
+dev.off()
+

@@ -1,0 +1,183 @@
+####### B-values extraction for futher analysis  #######
+# 122 pediatric sarcomas
+# Sample_group as histhopathological classifiation
+# Executed by: Felipe Luz
+#Packs: Minfi
+
+# Load the script from the internet that is used in install bioconductor
+# source("http://bioconductor.org/biocLite.R")
+# 
+# # # Each of these commands tells Bioconductor to download and install each package
+# # library(biocLite)
+# BiocManager::install("minfi")
+# BiocManager::install("limma")
+# # BiocManager::install("IlluminaHumanMethylation450kkmanifest")
+# # # biocLite("ChAMP")
+# # # biocLite("DMRcate")
+# BiocManager::install("reshape")
+# BiocManager::install("ggplot2")
+# # # biocLite("car")
+# # # biocLite("RefFreeEWAS")
+# BiocManager::install("dplyr")
+
+# Load required libraries
+library(minfi)
+library(limma)
+library(IlluminaHumanMethylationEPICmanifest)
+# library(ChAMP)
+# library(DMRcate)
+library(reshape)
+library(ggplot2)
+# library(RefFreeEWAS)
+library(dplyr)
+
+### Data Importing
+
+# Load IDAT files from Illumina Infinium HumanMethylationEPIC BeadChips
+setwd("~/Analysis_124_SARC/Bval")
+baseDir <- ("~/Analysis_124_SARC/Bval/idats")
+list.files(baseDir)
+
+samplesheet <- read.metharray.sheet(baseDir)
+samplesheet$Slide <- as.factor(samplesheet$Slide)
+
+targets <- read.metharray.sheet(baseDir)
+targets
+sub(baseDir, "", targets$Basename)
+
+rset <- read.metharray.exp(targets = targets)
+
+rset
+
+samplesheet <- pData(rset)
+
+setwd("~/Analysis_124_SARC/Bval")
+### Quality Control analysis
+
+# Create Quality Control folder
+dir.create("QC")
+
+# Quality control report
+qcReport(rset, sampNames = samplesheet$Sample_Name, sampGroups = samplesheet$Sample_Group, pdf = "QC/qcReport.pdf")
+
+
+# Get detection p-values (detP) for all probed genomic positions
+detP = detectionP(rset)
+
+# Save mean detection p-values for each sample
+png("QC/barplot.png", width = 1200, height = 900, res = 100)
+barplot(colMeans(detP), las = 2, main = "Mean detection p-values", names.arg = samplesheet$Sample_Name)
+abline(h = 5e-04, col = "red")
+dev.off()
+
+### Data pre-processing
+
+# Create Pre-processing folder
+dir.create("Pre-processing")
+
+# Get Meth and Unmeth signals
+rset.raw <- preprocessRaw(rset)
+
+# SWAN normalization procedure
+mset.swan <- preprocessSWAN(rset, rset.raw)
+grset.swan <- mapToGenome(mset.swan)
+dir.create("normalization")
+qcswan <- getQC(mset.swan)
+png("normalization/quality_SWAN.png", width = 1200, height = 900, res = 100)
+par(mfrow = c(1,1))
+plotQC(qcswan) 
+dev.off()
+
+# FunNorm normalization procedure
+grset.fun <- preprocessFunnorm(rset)
+
+# Quantile normalization procedure
+grset.quantile <- preprocessQuantile(rset)
+
+
+
+#Density plot for all preprocessing compared to raw data
+png("Pre-processing/Densityplots_normalization.png", width = 1200, height = 900, res = 100)
+par(mfrow = c(2,2))
+densityPlot(rset.raw, sampGroups = samplesheet$Sample_Group, main = "Raw", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
+densityPlot(getBeta(grset.quantile), sampGroups = samplesheet$Sample_Group, main = "Quantile", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
+densityPlot(getBeta(grset.swan), sampGroups = samplesheet$Sample_Group, main = "SWAN", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
+densityPlot(getBeta(grset.fun), sampGroups = samplesheet$Sample_Group, main = "FunNorm", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
+dev.off()
+
+# Remove SNPs probes
+grset.funwosnps <- dropLociWithSnps(grset.fun, snps = c("SBE", "CpG"), maf = 0)
+
+# Remove sexual chromossomes
+grset.funwosnpsXY <- dropSeqlevels(grset.funwosnps, c("chrX", "chrY"), pruning.mode = "coarse") 
+
+# Get Sex
+dir.create("sex")
+predictedSex <- getSex(grset.fun, cutoff = -2)
+
+
+sex_df <- as.data.frame(predictedSex@listData)
+sex_df$name <- targets$Sample_Name
+head(predictedSex)
+write.csv2(sex_df,"sex/sex.control_original.csv")
+
+library(ggplot2)
+png("sex/sex.png", width = 1200, height = 900, res = 100)
+ggplot(sex_df, aes(x=xMed,y=yMed)) +  
+  geom_point(size=2, shape=23) +
+  geom_text(label=sex_df$name)
+dev.off()
+
+#getSnpBeta
+dir.create("SNPs")
+snps <- getSnpBeta(rset)
+head(snps)
+write.csv2(snps,"SNPs/snps.csv")
+
+png("SNPs/SNPs_1000pos.png", width = 1200, height = 900, res = 100)
+par(mfrow=c(1,1))
+par(oma=c(0.25,1,1,1))
+mdsPlot(snps, main = "SNPs", numPositions = 59, sampGroups = targets$Sample_Group, sampNames = targets$Sample_Name)
+dev.off()
+
+n <- ncol(detP)
+row <- nrow(grset.funwosnpsXY)
+
+cpg_id = matrix(nrow = row, ncol = n) 
+colnames(cpg_id) = colnames(detP)
+l = 1; j = 1; k = 1
+for(j in 1:n){
+  l = 1
+  for(k in 1:row){
+    if(detP[k, j] <= 0.01){
+      cpg_id[l, j] = rownames(detP)[k]
+      l = l+1
+    }
+  }
+}
+cpg_id = unique(cpg_id)
+
+#####################
+
+inter <- intersect(cpg_id[,1], cpg_id[,2])
+for(i in 3:n) inter <- intersect(cpg_id[,i], inter)
+inter <- inter[-c(length(inter))] # NA in last position
+
+##################
+
+grset.funwosnpsXY.wobadprobes <- grset.funwosnpsXY[row.names(grset.funwosnpsXY) %in% inter,]
+
+##Density plot for No Bad Probes
+dir.create("no_bad_probes")
+png("no_bad_probes/Densityplots_NoBadProbes.png", width = 1200, height = 900, res = 100)
+par(mfrow = c(1,1))
+densityPlot(getBeta(grset.funwosnpsXY.wobadprobes), sampGroups = samplesheet$Sample_Group, main = "Nobad", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
+dev.off()
+
+# Get B-values ### FIZ ###
+B = getBeta(grset.funwosnpsXY.wobadprobes)
+B <- as.data.frame(B)
+saveRDS(B,"~/Analysis_124_SARC/Bval/B.rds")
+
+
+
