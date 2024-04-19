@@ -184,7 +184,7 @@ par(mfrow = c(1,1))
 densityPlot(getBeta(grset.funwosnpsXY.wobadprobes), sampGroups = samplesheet$Sample_Group, main = "Nobad", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
 dev.off()
 
-# Get B-values ### FIZ ###
+# Get B-values ###
 B = getBeta(grset.funwosnpsXY.wobadprobes)
 B <- as.data.frame(B)
 saveRDS(B,"~/Analysis_124_SARC/Bval/B.rds")
