@@ -1,9 +1,6 @@
-# Heatmap, hierarchical clustering and tSNE from Beta-values matrix 
-#analyzed by: Felipe Luz
-#Samples:  244 IDATS (Sarcomas)
+# Bvalue as data frame salvo do script de Bval
+#group exclui 3 casos com score baico discordante da histo
 
-
-# B = B value Matrix obtained from Minfi
 
 library(dplyr)
 
@@ -12,17 +9,12 @@ group <- read.csv2("tsne.csv",sep=",")
  Bt <- t(B)
  Bt2 <- as.data.frame(Bt)
 
-# Bt2$sentrix <- rownames(Bt)
-
-# Bt2 <- Bt2 %>%
-#   filter(sentrix %in% group$sentrix)
-
-# Bt2$sentrix <- NULL
-
 
 
 #################################### tSNE #####################################
- 
+
+
+#prcomp_scds function 
 prcomp_svds <-
   function(x, retx = TRUE, center = TRUE, scale. = FALSE, tol = NULL, k=10, ...)
   {
@@ -55,6 +47,10 @@ prcomp_svds <-
 
 ##################################
 
+
+
+# Mantain order
+
 aux <- data.frame(1:nrow(group),1)
 aux$sentrix <- rownames(Bt2)
 
@@ -76,10 +72,13 @@ library(ggsci)
 
 
 
+
+
 # sd filtering to 10K for sarcomas
 betas <- Bt2[,order(-apply(Bt2,2,sd))[1:10000]]
 betas2 <- as.matrix(betas)
 new_data <- matrix(as.numeric(betas2[1:nrow(group), 1:10000]), ncol = 10000, nrow=nrow(group) ) #nrow: N samples
+
 
 
 
@@ -95,29 +94,29 @@ Y <- res$Y
 
 
 # scatterplot tSNE
-
+my_pal <- c("#951423", "#921629", "#8e1730", "#8b1936", "#871b3c", "#841c43", "#801e49", "#7d204f", "#792255", "#76235c", "#732562", "#6f2768", "#6c286f", "#682a75", "#652c7b", "#612d82", "#5e2f88", "#5a318e", "#573295", "#53349b", "#5036a1", "#4d37a8", "#4939ae", "#463bb4", "#423dba", "#3f3ec1", "#3b40c7", "#3842cd", "#3443d4", "#3145da")
 library(RColorBrewer)
 par(mar=c(3,4,2,2))
-display.brewer.all()
-myCol <- brewer.pal(10,"Spectral") 
+
 
 png("~/Analysis_124_SARC/tSNE/tSNE_122sarc.png",
-    width = 1900,
-    height = 1200)
+    width = 2000,
+    height = 800)
 ggplot(Y,
        aes(x=Y[,1],y=Y[,2],col=group3$CLASS.y, shape = group3$score_sum)) +
   scale_shape_manual(values=c(18,19,20))+
-  geom_point(size=5) +
+  geom_point(size=10) +
   labs(title = "tSNE Sarcomas",x="tsne - 1",y = "tsne - 2", color = group3$CLASS.y) +
   theme_minimal() +
   theme(legend.title = element_blank(),legend.position = "none",
         text = element_text(size = 15)) +
   ggrepel::geom_text_repel(data = Y, aes(label = group3$CLASS.y),
                            segment.colour="black",na.rm=FALSE, 
-                           max.overlaps=36) 
+                           max.overlaps=36, label.size = 5) +
+  scale_color_manual(values=my_pal)
 dev.off()
 
-##### HETAMAP ######
+##### HEATMAP ######
 heat <- as.data.frame(betas2[1:nrow(group),1:10000])
 heat2 <- t(heat)
 
@@ -129,8 +128,8 @@ library("pheatmap")
 colnames(heat2) <- group3$sentrix
 
 png("~/Analysis_124_SARC/tSNE/heatmap_122sarc.png",
-    width = 800,
-    height = 1200)
+    width = 1200,
+    height = 700)
 pheatmap(heat2,
          scale="none",
          cluster_cols = TRUE,
@@ -139,8 +138,7 @@ pheatmap(heat2,
          clustering_distance_rows = "euclidean",
          clustering_method = "ward",
          show_rownames = FALSE,
-         show_colnames = TRUE,
+         show_colnames = FALSE,
          annotation_col = col,
          color = colorRampPalette(c("#5981bd", "white", "#6a1127"))(1000))
 dev.off()
-
