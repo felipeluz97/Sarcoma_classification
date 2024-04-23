@@ -1,0 +1,33 @@
+# Alluvial plot (Histo x Methylation)
+#analyzed by: Felipe Luz
+#Date: 15/04/2024
+#pack: ggalluvial
+
+library(ggplot2)
+library(dplyr)
+library(ggalluvial)
+
+slope <- read.csv2("sankey_disc.csv",sep=",")
+
+df <- slope %>%
+  make_long(HISTO,CLASS) 
+
+library(RColorBrewer)
+my_pal <- c("#546ac4", "#6260b6", "#7056a7", "#7f4d99", "#8d438b", "#9b397c")
+
+
+png("~/Analysis_124_SARC/sankey/alluvial_only_discordant2sarc.png",
+    width = 800,
+    height = 600)
+ggplot(as.data.frame(slope),
+       aes(axis1 = HISTO, axis2 = CLASS)) +
+  geom_alluvium(aes(fill = CLASS)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("HISTO", "CLASS"), expand = c(.05, .05))+
+  scale_fill_manual(values = my_pal) +
+  theme_void()
+dev.off()
+
+
+
