@@ -1,7 +1,8 @@
 ####### B-values extraction for futher analysis  #######
-# 122 pediatric sarcomas
+# 124 pediatric sarcomas
 # Sample_group as histhopathological classifiation
 # Executed by: Felipe Luz
+# Date: 03/08/2023
 #Packs: Minfi
 
 # Load the script from the internet that is used in install bioconductor
@@ -46,10 +47,13 @@ targets
 sub(baseDir, "", targets$Basename)
 
 rset <- read.metharray.exp(targets = targets)
-# Change sentrix to sample name
+
+rset
+
 df <- data.frame(sentrix=rset@colData@rownames)
 names <- read.csv2("~/Analysis_124_SARC/CNV/SARC - names_to_Rset.csv",sep=",")
 df$names <- names$name[match(df$sentrix,names$sentrix)]
+
 
 # Check that order of cells is the same
 all.equal(rset@colData@rownames, df$sentrix)
@@ -57,7 +61,6 @@ all.equal(rset@colData@rownames, df$sentrix)
 
 # change sentrix to names
 rset@colData@rownames <- df$names
-rset
 
 samplesheet <- pData(rset)
 
@@ -138,6 +141,9 @@ ggplot(sex_df, aes(x=xMed,y=yMed)) +
   geom_text(label=sex_df$name)
 dev.off()
 
+
+
+
 #getSnpBeta
 dir.create("SNPs")
 snps <- getSnpBeta(rset)
@@ -153,6 +159,7 @@ dev.off()
 n <- ncol(detP)
 row <- nrow(grset.funwosnpsXY)
 
+#FIZ SEM RETIRAR AS RUINS
 cpg_id = matrix(nrow = row, ncol = n) 
 colnames(cpg_id) = colnames(detP)
 l = 1; j = 1; k = 1
@@ -184,10 +191,12 @@ par(mfrow = c(1,1))
 densityPlot(getBeta(grset.funwosnpsXY.wobadprobes), sampGroups = samplesheet$Sample_Group, main = "Nobad", legend = FALSE, xlim = c(0,1), ylim = c(0,4.5))
 dev.off()
 
-# Get B-values ###
+# Get B-values ### FIZ ###
 B = getBeta(grset.funwosnpsXY.wobadprobes)
 B <- as.data.frame(B)
 saveRDS(B,"~/Analysis_124_SARC/Bval/B.rds")
+
+
 
 
 
