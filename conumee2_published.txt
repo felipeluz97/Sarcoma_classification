@@ -1,8 +1,9 @@
 # CNV from methylome array intensities
 #analyzed by: Felipe Luz
-#Date: 15/04/2024
+#Date: 22/11/2022
 #pack: conumee2
-#Samples:  244 IDATS (Sarcomas)
+#Samples:  244 IDATS files (2 per sample)
+
 
 
 # 1. install
@@ -31,10 +32,10 @@ library("rlist")
 RGset <- read.metharray.exp(base = "~/Analysis_124_SARC/Bval/idats", targets = NULL, extended = FALSE,
                             recursive = FALSE, verbose = FALSE, force = FALSE) 
 
-# Change sentrix to sample name
 df <- data.frame(sentrix=RGset@colData@rownames)
 names <- read.csv2("~/Analysis_124_SARC/CNV/SARC - names_to_Rset.csv",sep=",")
 df$names <- names$name[match(df$sentrix,names$sentrix)]
+
 
 # Check that order of cells is the same
 all.equal(RGset@colData@rownames, df$sentrix)
@@ -43,10 +44,17 @@ all.equal(RGset@colData@rownames, df$sentrix)
 # change sentrix to names
 RGset@colData@rownames <- df$names
 
+
 Mset <- preprocessIllumina(RGset, bg.correct = TRUE, normalize = NULL)
 
 Mset
 
+#2.2controls (71 cordões umbilicais projeto Mari (32M,39F))
+# RGsetControl <- read.metharray.exp(base = "~/controles/EPIC_Gustavo", targets = NULL, extended = FALSE,
+#                                    recursive = FALSE, verbose = FALSE, force = FALSE) 
+# Msetcontrol <- preprocessIllumina(RGsetControl, bg.correct = TRUE, normalize = NULL)
+# 
+# Msetcontrol
 library("minfiData")
 data(MsetEx)
 MsetEx
@@ -64,8 +72,7 @@ d <- CNV.load(Mset)
 data(exclude_regions)
 data(detail_regions)
 
-# In case you want to plot genes other than default
-# Genes is a df containing: chrom (i.e chr2), cdsStart, cdsEnd, strand and name2, which can be obtained from UCSC table browser
+#para escolher as regioes de interesse, incluindo éxons, Table Browser (gene and Gene prediction,NCBI refSeq)
 # 
 # genes <- read.csv2("~/IDATS_boldrini/Analysis_269/CNV_imprint/genes_reduced.csv",sep=";")
 # as.data.frame(genes)
@@ -92,6 +99,8 @@ annoR@probes <- subsetByOverlaps(annoR@probes, granges(Mset))
 
 
 ###################### 5 Perform CNV analysis ##########################################
+# normalization: 20 healthy twins (EPIC idatfiles)
+
 aux <- colnames(d@intensity)
 lista <- list()
 length(aux)
@@ -112,7 +121,6 @@ for(i in 1:length(aux))
   lista[[i]] <- R
 }
 
-# Here we subset objects by molecular class to plot sumary plots
 # filter for OS, ES, BCOR, CIC and RMS for summary plot
 # Total (122)
 x_total <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d,
@@ -152,6 +160,7 @@ x_BCOR <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_BCOR,
 group_CIC <- group %>%
   filter(class %in% c("CNS_SARC_CIC"))
 CIC <- group_CIC$names
+CIC <- CIC[-1]
 d_CIC <- d
 d_CIC@intensity <- d_CIC@intensity[CIC]
 
@@ -178,9 +187,22 @@ d_SYSA@intensity <- d_SYSA@intensity[SYSA]
 x_SYSA <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_SYSA,
                                                 ref =minfi.data[minfi.controls], annoR))))
 
+
+# LCH
+
+group <- read.csv2("~/Analysis_124_SARC/CNV/SARC - sankey.csv",sep=",")
+
+group_INF <- group %>%
+  filter(CLASS %in% c("LCH","IMT"))
+INF <- group_INF$NAME
+d_INF<- d
+d_INF@intensity <- d_INF@intensity[INF]
+
+x_INF <- CNV.segment(CNV.detail(CNV.bin(CNV.fit(query = d_INF,
+                                                 ref =minfi.data[minfi.controls], annoR))))
 saveRDS(lista,"~/Analysis_124_SARC/CNV/output/lista.rds")
 saveRDS(x,"~/Analysis_124_SARC/CNV/output/x.rds")
-##################### 6. Output plots and text files ###################################
+##################### 6 Output plots and text files ###################################
 
 # Text file 
 dir.create(("~/Analysis_124_SARC/CNV/output"))
@@ -202,8 +224,9 @@ for(i in 1:length(aux))
 
 
 
+
 png(file = "~/Analysis_124_SARC/CNV/output/heatmap.png",
-    width = 3000, height = 800)
+    width = 900, height = 700)
 CNV.heatmap(x_total)
 dev.off()
 
@@ -218,6 +241,11 @@ dev.off()
 png(file = "~/Analysis_124_SARC/CNV/output/OS_summaryplot.png",
     width = 2000, height = 1100)
 CNV.summaryplot(x_OS, threshold = 0.15)
+dev.off()
+
+png(file = "~/Analysis_124_SARC/CNV/output/INF_summaryplot.png",
+    width = 2000, height = 1100)
+CNV.summaryplot(x_INF, threshold = 0.15)
 dev.off()
 
 png(file = "~/Analysis_124_SARC/CNV/output/ES_summaryplot.png",
@@ -259,5 +287,108 @@ i <- 6 # Search sample in names2RG to get the row namber (lista)
   dev.off()
   
   
+# Generate Overview data frame
+  over <- data.frame()
+  for(i in 1:length(aux)){
+    df <- CNV.write(lista[[i]], what = "overview")
+    over <- bind_rows(over,df)
+  }
   
+
+class <- read.csv2("~/Analysis_124_SARC/CNV/SARC - sankey.csv",sep=",")
+class <- class[,c(12,4,6)]
+
+over$CLASS <- class$CLASS[match(over$Sample,class$NAME)]
+over$score <- class$CONCORDANT[match(over$Sample,class$NAME)]
+
+length(unique(over$Sample))
+
+over$Seg.CN <- as.character(over$Seg.CN)
+
+
+write.csv2(over,"~/Analysis_124_SARC/CNV/output/CNV_overview.csv",row.names = FALSE)
+
+over <- read.csv2("~/Analysis_124_SARC/CNV/output/CNV_overview.csv",sep=";")
+
+# box plot alteration per class
+over2 <- over %>%
+  filter(Alteration %in% c("loss","gain"))
+
+length(unique(over2$Sample)) # N cases with at least 1 CNA
+
+
+over2 <- over2 %>%
+  filter(!score %in% c("NAO SE APLICA"))
+
+length(unique(over2$Sample))
+
+write.csv2(over2,"~/Analysis_124_SARC/CNV/output/over2.csv")
+
+# N alteration per sample
+box <- over2 %>%
+  count(c("CLASS","Sample","Alteration"))
+
+
+box$CLASS <- gsub("ERMS","RMS_EMB",box$CLASS)
+box$CLASS <- gsub("IMT","control",box$CLASS)
+box$CLASS <- gsub("LCH","control",box$CLASS)
+box$CLASS <- gsub("LCH","control",box$CLASS)
+
+box <- box %>%
+  filter(CLASS %in% c("OS_HG","EWING","RMS_EMB","control"))
+
+my_comparisons <- list(c("OS_HG","control"),
+                       c("RMS_EMB","control"),
+                       c("EWING","control"),
+                       c("OS_HG","RMS_EMB"),
+                       c("OS_HG","EWING"),
+                       c("EWING","RMS_EMB"))
+
+library(ggplot2)
+library(ggpubr)
+
+png("~/Analysis_124_SARC/CNV/nCNA_boxplot.png",
+    width = 600, height = 500)
+ggplot(box) +
+  aes(x = CLASS,y=n) +
+  geom_boxplot() +
+  geom_point(aes(shape = Alteration)) +
+  theme_minimal() +
+  labs(y ="Number of  CNA per sample", x = "Molecular class (calibrated score >0.84)") +
+  scale_x_discrete(limits = c("control","EWING","RMS_EMB","OS_HG")) +
+stat_compare_means(method = "t.test",comparisons = my_comparisons)
+dev.off()
+
+# N altered chromosome per sample
+box <- over2 %>%
+  count(c("CLASS", "Sample","Chromosome"))
+
+
+box$CLASS <- gsub("ERMS","RMS_EMB",box$CLASS)
+box$CLASS <- gsub("IMT","control",box$CLASS)
+box$CLASS <- gsub("LCH","control",box$CLASS)
+box$CLASS <- gsub("LCH","control",box$CLASS)
+
+box <- box %>%
+  filter(CLASS %in% c("OS_HG","EWING","RMS_EMB","control"))
+
+library(ggplot2)
+
+png("~/Analysis_124_SARC/CNV/nChr_boxplot.png",
+    width = 600, height = 500)
+ggplot(box) +
+  aes(x = CLASS,y=n) +
+  geom_boxplot() +
+  geom_point() +
+  theme_minimal() +
+  labs(y ="Number of altered chromosome per sample", x = "Molecular class (calibrated score >0.84)") +
+  scale_x_discrete(limits = c("control","EWING","RMS_EMB","OS_HG")) +
+  coord_cartesian(ylim=c(0,13)) +
+  stat_compare_means(method = "t.test",comparisons = my_comparisons)
+dev.off()
+
+box_gain <- box %>%
+  filter(Alteration == "gain")
+box_loss<- box %>%
+  filter(Alteration == "loss")
 
