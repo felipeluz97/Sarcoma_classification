@@ -98,4 +98,16 @@ mat %>%
   scale_fill_manual(values=myCol) 
 dev.off()
 
+# Calc minimal tumor purity for a score of 0.9
+df = read.csv("~/Analysis_124_SARC/TILS/purityVSscore.csv") # df being a data frame of sentrix, SCORE and PURITY
+model <- lm(SCORE ~ Purity, data = df)
+summary(model)
+coef_model <- coef(model)
+intercepto <- coef_model[1]
+cat("Intercepto (beta_0):", intercepto, "\n")
+coef_pureza <- coef_model[2]  
+pureza_min <- (0.9 - intercepto) / coef_pureza
+cat("Minimal tumor purity for a score of 0.9 is:", pureza_min, "\n")
+
+
 
